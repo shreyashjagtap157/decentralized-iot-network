@@ -1,0 +1,329 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # Smart Contracts Testing
+  smart-contracts-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: smart-contracts/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: ./smart-contracts
+      run: npm ci
+    
+    - name: Compile contracts
+      working-directory: ./smart-contracts
+      run: npx hardhat compile
+    
+    - name: Run tests
+      working-directory: ./smart-contracts
+      run: npm test
+    
+    - name: Generate coverage report
+      working-directory: ./smart-contracts
+      run: npx hardhat coverage
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./smart-contracts/coverage/lcov.info
+        flags: smart-contracts
+
+  # Backend Services Testing
+  backend-test:
+    runs-on: ubuntu-latest
+    
+    services:
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+      
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: iot_network_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+    - name: Secret scan (truffleHog)
+      uses: trufflesecurity/trufflehog@v3.67.3
+      with:
+        scanArguments: --path backend-services --fail
+    
+    - name: Install dependencies
+      working-directory: ./backend-services
+      run: |
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+    
+    - name: Run linting
+      working-directory: ./backend-services
+      run: |
+        flake8 app/
+        black --check app/
+        isort --check app/
+    
+    - name: Run type checking
+      working-directory: ./backend-services
+      run: mypy app/
+    
+    - name: Run tests
+      working-directory: ./backend-services
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/iot_network_test
+        REDIS_URL: redis://localhost:6379
+        TESTING: true
+      run: |
+        pytest tests/ -v --cov=app --cov-report=xml
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./backend-services/coverage.xml
+        flags: backend
+
+  # Frontend Testing
+  frontend-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: web-dashboard/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: ./web-dashboard
+      run: npm ci
+    
+    - name: Run linting
+      working-directory: ./web-dashboard
+      run: npm run lint
+    
+    - name: Run type checking
+      working-directory: ./web-dashboard
+      run: npm run type-check
+    
+    - name: Run tests
+      working-directory: ./web-dashboard
+      run: npm run test:coverage
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./web-dashboard/coverage/lcov.info
+        flags: frontend
+    
+    - name: Build application
+      working-directory: ./web-dashboard
+      run: npm run build
+
+  # Security Scanning
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+    
+    - name: Run npm audit
+      working-directory: ./web-dashboard
+      run: npm audit --audit-level high
+    
+    - name: Run pip safety check
+      working-directory: ./backend-services
+      run: |
+        pip install safety
+        safety check
+
+  # Docker Build and Push
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: [smart-contracts-test, backend-test, frontend-test]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha
+    
+    - name: Build and push backend image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./backend-services
+        push: true
+        tags: ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+    
+    - name: Build and push frontend image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./web-dashboard
+        push: true
+        tags: ghcr.io/${{ github.repository }}/frontend:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # Deploy to Staging
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Deploy to staging
+      run: |
+        echo "Deploying to staging environment..."
+        # Add deployment commands here
+        # e.g., kubectl, terraform, or cloud provider CLI commands
+
+  # Deploy to Production
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Deploy to production
+      run: |
+        echo "Deploying to production environment..."
+        # Add production deployment commands here
+    
+    - name: Run smoke tests
+      run: |
+        echo "Running smoke tests..."
+        # Add smoke test commands here
+    
+    - name: Notify deployment
+      if: always()
+      run: |
+        SLACK_WEBHOOK_URL="${{ secrets.SLACK_WEBHOOK_URL }}"
+        if [ "${{ job.status }}" == "success" ]; then
+          MESSAGE="✅ Deployment successful for ${{ github.ref }}"
+        else
+          MESSAGE="❌ Deployment failed for ${{ github.ref }}"
+        fi
+        curl -X POST -H 'Content-type: application/json' \
+          --data "{\"channel\":\"#deployments\",\"text\":\"$MESSAGE\"}" \
+          "$SLACK_WEBHOOK_URL"
+
+  # Performance Testing
+  performance-test:
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    if: github.ref == 'refs/heads/develop'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run Lighthouse CI
+      uses: treosh/lighthouse-ci-action@v10
+      with:
+        configPath: './web-dashboard/lighthouserc.json'
+        uploadArtifacts: true
+        temporaryPublicStorage: true
+    
+    - name: Run load tests
+      run: |
+        echo "Running load tests..."
+        # Add load testing commands (e.g., k6, Artillery)
+
+  # Notification
+  notify:
+    runs-on: ubuntu-latest
+    needs: [smart-contracts-test, backend-test, frontend-test, security-scan]
+    if: always()
+    
+    steps:
+    - name: Notify team
+      if: always()
+      run: |
+        SLACK_WEBHOOK_URL="${{ secrets.SLACK_WEBHOOK_URL }}"
+        if [ "${{ job.status }}" == "success" ]; then
+          MESSAGE="✅ CI/CD pipeline completed successfully"
+        else
+          MESSAGE="❌ CI/CD pipeline failed"
+        fi
+        curl -X POST -H 'Content-type: application/json' \
+          --data "{\"channel\":\"#ci-cd\",\"text\":\"$MESSAGE\",\"attachments\":[{\"text\":\"Repo: ${{ github.repository }}\nCommit: ${{ github.sha }}\nAuthor: ${{ github.actor }}\"}]}" \
+          "$SLACK_WEBHOOK_URL"

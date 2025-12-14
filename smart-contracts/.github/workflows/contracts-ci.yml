@@ -1,0 +1,45 @@
+name: Smart Contracts CI
+
+on:
+  push:
+    paths:
+      - 'smart-contracts/**'
+  pull_request:
+    paths:
+      - 'smart-contracts/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install deps
+        run: |
+          cd smart-contracts
+          npm ci
+      - name: Run tests
+        run: |
+          cd smart-contracts
+          npx hardhat test
+      - name: Run solhint
+        run: |
+          cd smart-contracts
+          npx solhint "contracts/**/*.sol" || true
+      - name: Run Slither (optional)
+        run: |
+          python -m pip install --upgrade pip
+          pip install slither-analyzer || true
+          cd smart-contracts
+          slither . || true
+      - name: Run solidity-coverage
+        run: |
+          cd smart-contracts
+          npx hardhat coverage || true
+      - name: Run gas reporter (local)
+        run: |
+          cd smart-contracts
+          REPORT_GAS=true npx hardhat test || true

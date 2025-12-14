@@ -1,0 +1,15 @@
+pytest
+pytest-cov
+mypy
+black
+ruff
+flake8
+safety
+# Type stubs for mypy
+types-python-jose
+types-passlib
+types-redis
+types-hvac
+types-opentelemetry-api
+types-opentelemetry-sdk
+types-setuptools

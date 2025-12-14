@@ -1,0 +1,41 @@
+{
+  "name": "decentralized-iot-contracts",
+  "version": "1.0.0",
+  "description": "Smart contracts for decentralized IoT network",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy": "hardhat run scripts/deploy.ts",
+    "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
+    "deploy:goerli": "hardhat run scripts/deploy.ts --network goerli",
+    "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia",
+    "node": "hardhat node",
+    "clean": "hardhat clean",
+    "coverage": "hardhat coverage",
+    "gas-report": "REPORT_GAS=true hardhat test",
+    "lint:solidity": "solhint 'contracts/**/*.sol'",
+    "analyze:slither": "slither . || true"
+  },
+  "dependencies": {
+  "@openzeppelin/contracts": "^5.0.2"
+  },
+  "devDependencies": {
+  "@nomicfoundation/hardhat-toolbox": "^3.0.0",
+  "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
+    "@types/chai": "^4.4.0",
+    "@types/mocha": "^10.2.0",
+    "@types/node": "^22.0.0",
+    "chai": "^4.4.1",
+    "dotenv": "^16.4.0",
+    "ethers": "^6.10.0",
+    "hardhat": "^2.21.0",
+    "hardhat-gas-reporter": "^2.0.0",
+    "solidity-coverage": "^0.8.5",
+  "solhint": "^4.0.0",
+  "slither-analyzer": "^0.11.0",
+    "ts-node": "^11.0.0",
+    "typescript": "^5.4.0",
+    "husky": "^9.0.0",
+    "lint-staged": "^15.0.0"
+  }
+}

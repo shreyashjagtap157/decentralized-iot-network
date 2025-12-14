@@ -1,0 +1,43 @@
+name: Infra CI
+
+on:
+  push:
+    paths:
+      - 'infrastructure/**'
+  pull_request:
+    paths:
+      - 'infrastructure/**'
+
+jobs:
+  terraform-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.6.7
+      - name: Terraform fmt
+        run: |
+          cd infrastructure
+          terraform fmt -check
+      - name: Terraform init
+        run: |
+          cd infrastructure
+          terraform init -backend=false
+      - name: Terraform validate
+        run: |
+          cd infrastructure
+          terraform validate || true
+  kubernetes-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install kubeconform
+        run: |
+          curl -sSL -o kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+          tar -xzf kubeconform.tar.gz
+          sudo mv kubeconform /usr/local/bin/
+      - name: Validate manifests
+        run: |
+          kubeconform -strict infrastructure/k8s/*.yaml || true

@@ -1,0 +1,62 @@
+name: Mobile App CI/CD
+
+on:
+  push:
+    paths:
+      - 'mobile-app/**'
+  pull_request:
+    paths:
+      - 'mobile-app/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [android, ios, web]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          channel: stable
+
+      - name: Install dependencies
+        run: flutter pub get
+        working-directory: mobile-app
+
+      - name: Analyze code
+        run: flutter analyze
+        working-directory: mobile-app
+
+      - name: Run tests
+        run: flutter test
+        working-directory: mobile-app
+
+      - name: Build APK (Android)
+        if: matrix.platform == 'android'
+        run: flutter build apk --release
+        working-directory: mobile-app
+
+      - name: Build iOS (macOS only)
+        if: matrix.platform == 'ios' && runner.os == 'macOS'
+        run: flutter build ios --release --no-codesign
+        working-directory: mobile-app
+
+      - name: Build Web
+        if: matrix.platform == 'web'
+        run: flutter build web --release
+        working-directory: mobile-app
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.platform }}
+          path: |
+            mobile-app/build/app/outputs/flutter-apk/*.apk
+            mobile-app/build/ios/iphoneos/*.app
+            mobile-app/build/web/

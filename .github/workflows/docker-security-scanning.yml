@@ -1,0 +1,95 @@
+name: Docker Security Scanning with Trivy
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'backend-services/Dockerfile'
+      - 'web-dashboard/Dockerfile'
+      - 'device-firmware/Dockerfile'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**Dockerfile'
+
+jobs:
+  trivy-scan-backend:
+    runs-on: ubuntu-latest
+    name: Scan Backend Image
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Trivy vulnerability scanner for Backend
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: 'backend-services/Dockerfile'
+          format: 'sarif'
+          output: 'backend-trivy-results.sarif'
+      
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'backend-trivy-results.sarif'
+          category: 'trivy-backend'
+
+  trivy-scan-frontend:
+    runs-on: ubuntu-latest
+    name: Scan Frontend Image
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Trivy vulnerability scanner for Frontend
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: 'web-dashboard/Dockerfile'
+          format: 'sarif'
+          output: 'frontend-trivy-results.sarif'
+      
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'frontend-trivy-results.sarif'
+          category: 'trivy-frontend'
+
+  trivy-scan-firmware:
+    runs-on: ubuntu-latest
+    name: Scan Firmware Image
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Trivy vulnerability scanner for Firmware
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: 'device-firmware/Dockerfile'
+          format: 'sarif'
+          output: 'firmware-trivy-results.sarif'
+      
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'firmware-trivy-results.sarif'
+          category: 'trivy-firmware'
+
+  trivy-scan-fs:
+    runs-on: ubuntu-latest
+    name: Scan Filesystem
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Trivy vulnerability scanner for Filesystem
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'fs-trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+      
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'fs-trivy-results.sarif'
+          category: 'trivy-filesystem'

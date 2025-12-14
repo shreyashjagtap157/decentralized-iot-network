@@ -1,0 +1,201 @@
+version: '3.8'
+
+services:
+  # ===========================================
+  # Backend API Service (FastAPI)
+  # ===========================================
+  backend:
+    build:
+      context: ./backend-services
+      dockerfile: Dockerfile
+    container_name: iot-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://iot_user:iot_password@postgres:5432/iot_network
+      - REDIS_URL=redis://redis:6379/0
+      - MQTT_BROKER_HOST=mqtt
+      - MQTT_BROKER_PORT=1883
+      - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production
+      - PYTHONPATH=/app
+    volumes:
+      - ./backend-services:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      mqtt:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - iot-network
+    restart: unless-stopped
+
+  # ===========================================
+  # Web Dashboard (Next.js)
+  # ===========================================
+  frontend:
+    build:
+      context: ./web-dashboard
+      dockerfile: Dockerfile
+    container_name: iot-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_WS_URL=ws://localhost:8000
+    volumes:
+      - ./web-dashboard:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+    networks:
+      - iot-network
+    restart: unless-stopped
+
+  # ===========================================
+  # PostgreSQL Database
+  # ===========================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: iot-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=iot_user
+      - POSTGRES_PASSWORD=iot_password
+      - POSTGRES_DB=iot_network
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U iot_user -d iot_network"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - iot-network
+    restart: unless-stopped
+
+  # ===========================================
+  # Redis Cache
+  # ===========================================
+  redis:
+    image: redis:7-alpine
+    container_name: iot-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - iot-network
+    restart: unless-stopped
+
+  # ===========================================
+  # MQTT Broker (Mosquitto)
+  # ===========================================
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: iot-mqtt
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+    networks:
+      - iot-network
+    restart: unless-stopped
+
+  # ===========================================
+  # Hardhat Node (Local Blockchain)
+  # ===========================================
+  hardhat:
+    build:
+      context: ./smart-contracts
+      dockerfile: Dockerfile.hardhat
+    container_name: iot-hardhat
+    ports:
+      - "8545:8545"
+    command: npx hardhat node --hostname 0.0.0.0
+    networks:
+      - iot-network
+    profiles:
+      - blockchain
+
+  # ===========================================
+  # Prometheus (Metrics)
+  # ===========================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: iot-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - iot-network
+    profiles:
+      - monitoring
+    restart: unless-stopped
+
+  # ===========================================
+  # Grafana (Dashboards)
+  # ===========================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: iot-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    networks:
+      - iot-network
+    profiles:
+      - monitoring
+    restart: unless-stopped
+
+# ===========================================
+# Networks
+# ===========================================
+networks:
+  iot-network:
+    driver: bridge
+    name: iot-network
+
+# ===========================================
+# Volumes
+# ===========================================
+volumes:
+  postgres_data:
+    name: iot-postgres-data
+  redis_data:
+    name: iot-redis-data
+  prometheus_data:
+    name: iot-prometheus-data
+  grafana_data:
+    name: iot-grafana-data

@@ -1,0 +1,51 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "IoT Network Dashboard",
+    "tags": ["iot", "network"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Active Devices",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "active_devices_total",
+            "legendFormat": "Active Devices"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Network Throughput",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(network_bytes_relayed_total[5m])",
+            "legendFormat": "Bytes/sec"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Device Registrations",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "increase(device_registrations_total[1h])",
+            "legendFormat": "New Registrations"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8}
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "10s"
+  }
+}

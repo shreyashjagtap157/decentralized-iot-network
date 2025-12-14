@@ -1,0 +1,24 @@
+{
+  "id": null,
+  "title": "IoT Network - Overview",
+  "uid": "iot-overview",
+  "panels": [
+    {
+      "type": "graph",
+      "title": "Backend HTTP 5xx Rate",
+      "targets": [
+        { "expr": "rate(http_requests_total{code=~\"5..\"}[5m])" }
+      ],
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 6 }
+    },
+    {
+      "type": "graph",
+      "title": "Mosquitto Connections",
+      "targets": [
+        { "expr": "mosquitto_connections_total" }
+      ],
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 6 }
+    }
+  ],
+  "schemaVersion": 27
+}

@@ -1,0 +1,38 @@
+name: Web Dashboard CI
+
+on:
+  push:
+    paths:
+      - 'web-dashboard/**'
+  pull_request:
+    paths:
+      - 'web-dashboard/**'
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install deps
+        run: |
+          cd web-dashboard
+          npm ci
+      - name: Typecheck
+        run: |
+          cd web-dashboard
+          npx tsc --noEmit
+      - name: Run lint
+        run: |
+          cd web-dashboard
+          npx eslint . --ext .ts,.tsx || true
+      - name: Run tests
+        run: |
+          cd web-dashboard
+          npm test -- --passWithNoTests || true

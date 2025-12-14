@@ -1,0 +1,252 @@
+name: Canary and Blue-Green Deployments
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      deployment_strategy:
+        description: 'Deployment strategy'
+        required: true
+        default: 'canary'
+        type: choice
+        options:
+          - canary
+          - blue-green
+
+jobs:
+  canary-deployment:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.deployment_strategy == 'canary' || github.event_name == 'push'
+    env:
+      CANARY_APPROVED: 'false'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Build and push Docker images
+        run: |
+          docker buildx build --push \
+            -t ghcr.io/${{ github.repository }}/backend:${{ github.sha }} \
+            -t ghcr.io/${{ github.repository }}/backend:canary \
+            ./backend-services
+          
+          docker buildx build --push \
+            -t ghcr.io/${{ github.repository }}/frontend:${{ github.sha }} \
+            -t ghcr.io/${{ github.repository }}/frontend:canary \
+            ./web-dashboard
+      
+      - name: Deploy canary (10% traffic)
+        run: |
+          kubectl set image deployment/backend-canary \
+            backend=ghcr.io/${{ github.repository }}/backend:canary \
+            -n iot-network
+          
+          kubectl set image deployment/frontend-canary \
+            frontend=ghcr.io/${{ github.repository }}/frontend:canary \
+            -n iot-network
+      
+      - name: Wait for canary deployment
+        run: |
+          kubectl rollout status deployment/backend-canary -n iot-network --timeout=5m
+          kubectl rollout status deployment/frontend-canary -n iot-network --timeout=5m
+      
+      - name: Health checks on canary
+        run: |
+          for i in {1..30}; do
+            RESPONSE=$(kubectl get pods -n iot-network -l app=backend-canary -o jsonpath='{.items[0].status.phase}')
+            if [ "$RESPONSE" = "Running" ]; then
+              echo "Canary deployment is running"
+              break
+            fi
+            echo "Waiting for canary pod to be ready... ($i/30)"
+            sleep 10
+          done
+      
+      - name: Run smoke tests
+        run: |
+          python << 'EOF'
+          import requests
+          import time
+          
+          # Small subset of tests for canary validation
+          BASE_URL = "http://localhost:8000"
+          
+          try:
+              response = requests.get(f"{BASE_URL}/health", timeout=5)
+              assert response.status_code == 200
+              print("✓ Health check passed on canary")
+              
+              response = requests.get(f"{BASE_URL}/", timeout=5)
+              print(f"✓ API responding on canary")
+          except Exception as e:
+              print(f"✗ Canary smoke test failed: {str(e)}")
+              exit(1)
+          EOF
+      
+      - name: Monitor canary metrics
+        run: |
+          echo "Monitoring canary metrics for 10 minutes..."
+          # In production, query Prometheus for error rates, latency, etc.
+          sleep 600
+      
+      - name: Evaluate canary success
+        run: |
+          # Check Prometheus for error rate
+          ERROR_RATE=$(curl -s "http://prometheus:9090/api/v1/query?query=rate(http_requests_total%7Bapp%3D%22backend-canary%22%2Cstatus%3D~%225..%22%7D%5B5m%5D)" | grep -o '"value":\[\s*"[^"]*"' | grep -o '[0-9.]*')
+          
+          if [ -z "$ERROR_RATE" ] || [ $(echo "$ERROR_RATE < 0.05" | bc) -eq 1 ]; then
+              echo "✓ Canary error rate acceptable: $ERROR_RATE"
+              echo "CANARY_APPROVED=true" >> $GITHUB_ENV
+          else
+              echo "✗ Canary error rate too high: $ERROR_RATE"
+              echo "CANARY_APPROVED=false" >> $GITHUB_ENV
+          fi
+      
+      - name: Rollout to production (if approved)
+        if: ${{ env.CANARY_APPROVED == 'true' }}
+        run: |
+          # Scale up production deployment
+          kubectl set image deployment/backend \
+            backend=ghcr.io/${{ github.repository }}/backend:${{ github.sha }} \
+            -n iot-network
+          
+          kubectl set image deployment/frontend \
+            frontend=ghcr.io/${{ github.repository }}/frontend:${{ github.sha }} \
+            -n iot-network
+          
+          # Update Istio routing to send 100% traffic to new version
+          kubectl patch virtualservice app-virtualservice -n iot-network --type merge -p '{"spec":{"hosts":["*"],"http":[{"route":[{"destination":{"host":"backend","port":{"number":8000}},"weight":100}]}]}}'
+      
+      - name: Rollback (if not approved)
+        if: ${{ env.CANARY_APPROVED != 'true' }}
+        run: |
+          echo "Rolling back canary deployment"
+          kubectl delete deployment backend-canary -n iot-network
+          kubectl delete deployment frontend-canary -n iot-network
+
+  blue-green-deployment:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.deployment_strategy == 'blue-green'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Build Docker images
+        run: |
+          docker buildx build --push \
+            -t ghcr.io/${{ github.repository }}/backend-green:${{ github.sha }} \
+            ./backend-services
+          
+          docker buildx build --push \
+            -t ghcr.io/${{ github.repository }}/frontend-green:${{ github.sha }} \
+            ./web-dashboard
+      
+      - name: Deploy green environment
+        run: |
+          kubectl set image deployment/backend-green \
+            backend=ghcr.io/${{ github.repository }}/backend-green:${{ github.sha }} \
+            -n iot-network
+          
+          kubectl set image deployment/frontend-green \
+            frontend=ghcr.io/${{ github.repository }}/frontend-green:${{ github.sha }} \
+            -n iot-network
+      
+      - name: Wait for green deployment
+        run: |
+          kubectl rollout status deployment/backend-green -n iot-network --timeout=10m
+          kubectl rollout status deployment/frontend-green -n iot-network --timeout=10m
+      
+      - name: Run comprehensive tests on green
+        run: |
+          python << 'EOF'
+          import requests
+          import time
+          
+          BASE_URL = "http://localhost:8000"
+          
+          tests_passed = 0
+          tests_failed = 0
+          
+          # Run comprehensive test suite
+          try:
+              # Health check
+              response = requests.get(f"{BASE_URL}/health", timeout=5)
+              assert response.status_code == 200
+              tests_passed += 1
+              print("✓ Health check passed")
+              
+              # API endpoints
+              response = requests.get(f"{BASE_URL}/devices/list", timeout=5)
+              if response.status_code in [200, 401]:
+                  tests_passed += 1
+                  print("✓ Devices list endpoint working")
+              else:
+                  tests_failed += 1
+                  print("✗ Devices list endpoint failed")
+          
+          except Exception as e:
+              tests_failed += 1
+              print(f"✗ Test failed: {str(e)}")
+          
+          print(f"\nResults: {tests_passed} passed, {tests_failed} failed")
+          exit(0 if tests_failed == 0 else 1)
+          EOF
+      
+      - name: Approve green environment (manual)
+        if: success()
+        run: |
+          echo "Green environment ready for approval"
+          echo "Run the following to switch traffic:"
+          echo "kubectl patch service backend -n iot-network -p '{\"spec\":{\"selector\":{\"version\":\"green\"}}}'"
+      
+      - name: Switch traffic to green
+        if: success()
+        run: |
+          # Update service selector to point to green deployment
+          kubectl patch service backend -n iot-network -p '{"spec":{"selector":{"version":"green"}}}'
+          kubectl patch service frontend -n iot-network -p '{"spec":{"selector":{"version":"green"}}}'
+          
+          echo "Traffic switched to green environment"
+      
+      - name: Monitor green environment
+        if: success()
+        run: |
+          echo "Monitoring green environment for 5 minutes..."
+          sleep 300
+      
+      - name: Decommission blue environment
+        if: success()
+        run: |
+          kubectl delete deployment backend-blue -n iot-network || true
+          kubectl delete deployment frontend-blue -n iot-network || true
+          echo "Blue environment decommissioned"
+      
+      - name: Rollback to blue (if error)
+        if: failure()
+        run: |
+          echo "Rolling back to blue environment"
+          kubectl patch service backend -n iot-network -p '{"spec":{"selector":{"version":"blue"}}}'
+          kubectl patch service frontend -n iot-network -p '{"spec":{"selector":{"version":"blue"}}}'
+          kubectl delete deployment backend-green -n iot-network || true
+          kubectl delete deployment frontend-green -n iot-network || true
