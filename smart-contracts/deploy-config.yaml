@@ -1,0 +1,144 @@
+# Multi-Chain Deployment Configuration
+
+# Network configurations for all supported chains
+networks:
+  ethereum:
+    chain_id: 1
+    rpc_url: "https://mainnet.infura.io/v3/${INFURA_KEY}"
+    explorer: "https://etherscan.io"
+    native_token: "ETH"
+    gas_price_gwei: 30
+    confirmations: 12
+    contracts:
+      token: "0x..."  # To be deployed
+      compensation: "0x..."
+      governance: "0x..."
+      staking: "0x..."
+      bridge: "0x..."
+      nft: "0x..."
+
+  polygon:
+    chain_id: 137
+    rpc_url: "https://polygon-rpc.com"
+    explorer: "https://polygonscan.com"
+    native_token: "MATIC"
+    gas_price_gwei: 50
+    confirmations: 64
+    contracts:
+      token: "0x..."
+      compensation: "0x..."
+      governance: "0x..."
+      staking: "0x..."
+      bridge: "0x..."
+      nft: "0x..."
+
+  bsc:
+    chain_id: 56
+    rpc_url: "https://bsc-dataseed.binance.org"
+    explorer: "https://bscscan.com"
+    native_token: "BNB"
+    gas_price_gwei: 5
+    confirmations: 15
+    contracts:
+      token: "0x..."
+      compensation: "0x..."
+      governance: "0x..."
+      staking: "0x..."
+      bridge: "0x..."
+      nft: "0x..."
+
+  arbitrum:
+    chain_id: 42161
+    rpc_url: "https://arb1.arbitrum.io/rpc"
+    explorer: "https://arbiscan.io"
+    native_token: "ETH"
+    gas_price_gwei: 0.1
+    confirmations: 64
+    contracts:
+      token: "0x..."
+      compensation: "0x..."
+      governance: "0x..."
+      staking: "0x..."
+      bridge: "0x..."
+      nft: "0x..."
+
+  optimism:
+    chain_id: 10
+    rpc_url: "https://mainnet.optimism.io"
+    explorer: "https://optimistic.etherscan.io"
+    native_token: "ETH"
+    gas_price_gwei: 0.001
+    confirmations: 64
+    contracts:
+      token: "0x..."
+      compensation: "0x..."
+      governance: "0x..."
+      staking: "0x..."
+      bridge: "0x..."
+      nft: "0x..."
+
+# Testnet configurations
+testnets:
+  sepolia:
+    chain_id: 11155111
+    rpc_url: "https://sepolia.infura.io/v3/${INFURA_KEY}"
+    explorer: "https://sepolia.etherscan.io"
+    faucet: "https://sepoliafaucet.com"
+    
+  mumbai:
+    chain_id: 80001
+    rpc_url: "https://rpc-mumbai.maticvigil.com"
+    explorer: "https://mumbai.polygonscan.com"
+    faucet: "https://mumbaifaucet.com"
+
+  bsc_testnet:
+    chain_id: 97
+    rpc_url: "https://data-seed-prebsc-1-s1.binance.org:8545"
+    explorer: "https://testnet.bscscan.com"
+    faucet: "https://testnet.binance.org/faucet-smart"
+
+# Deployment parameters
+deployment:
+  oracle_address: "${ORACLE_ADDRESS}"
+  initial_reward_rate: 1000000000000  # 0.000001 tokens per byte
+  initial_quality_threshold: 50
+  token_initial_supply: 1000000000000000000000000000  # 1 billion tokens
+  
+  governance:
+    voting_delay: 86400       # 1 day
+    voting_period: 604800     # 7 days
+    proposal_threshold: 10000000000000000000000  # 10,000 tokens
+    quorum: 100000000000000000000000  # 100,000 tokens
+    timelock: 172800          # 2 days
+
+  staking:
+    reward_rate_per_second: 1000000000000000  # 0.001 tokens
+    early_unstake_penalty: 1000  # 10% in basis points
+    
+  bridge:
+    fee_basis_points: 50      # 0.5%
+    required_signatures: 2
+    daily_limit: 10000000000000000000000000  # 10 million tokens
+
+# Validator configuration
+validators:
+  - address: "${VALIDATOR_1}"
+    name: "Primary Validator"
+  - address: "${VALIDATOR_2}"
+    name: "Secondary Validator"
+  - address: "${VALIDATOR_3}"
+    name: "Backup Validator"
+
+# Security parameters
+security:
+  max_daily_mint: 1000000000000000000000000  # 1 million tokens
+  rate_limit_per_minute: 100
+  emergency_admin: "${EMERGENCY_ADMIN}"
+  
+# Gas estimation multipliers by chain
+gas_multipliers:
+  ethereum: 1.2
+  polygon: 1.1
+  bsc: 1.1
+  arbitrum: 1.0
+  optimism: 1.0
