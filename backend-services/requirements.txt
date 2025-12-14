@@ -13,7 +13,7 @@ passlib[bcrypt]==1.7.4
 python-multipart==0.0.18
 web3==6.18.0
 eth-typing==4.0.0
-starlette==0.37.2
+starlette==0.50.0
 ecdsa==0.19.1
 prometheus-fastapi-instrumentator==7.0.0
 structlog==24.1.0
