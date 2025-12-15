@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { api } from '../src/services/api';
 import {
   Box,
   Container,
@@ -110,24 +111,44 @@ export default function StakingPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // In production, fetch from API
+      // Fetch real data from API
+      // In a real app we would get the address from a wallet context
+      const demoAddress = "0x1234567890123456789012345678901234567890"; 
+      
+      const [statsData, userData] = await Promise.all([
+        api.getStakingStats(),
+        api.getUserStake(demoAddress).catch(() => null) // Handle new users gracefully
+      ]);
+
+      if (statsData) {
+        setStats({
+          totalStaked: statsData.total_staked,
+          rewardPool: statsData.reward_pool,
+          totalStakers: statsData.total_stakers,
+          apyEstimate: statsData.apy,
+        });
+      }
+
+      if (userData) {
+        setUserStake({
+          amount: userData.amount,
+          startTime: new Date(userData.start_time), // API returns ISO string
+          lockDurationDays: userData.lock_days,
+          multiplier: userData.multiplier,
+          pendingRewards: userData.pending_rewards,
+          tierName: userData.tier_name,
+          canUnstakeWithoutPenalty: !userData.is_locked,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch staking data:', error);
+      // Fallback to demo data if API fails (for demo purposes)
       setStats({
         totalStaked: 15000000,
         rewardPool: 500000,
         totalStakers: 1250,
         apyEstimate: 12.5,
       });
-      setUserStake({
-        amount: 25000,
-        startTime: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-        lockDurationDays: 90,
-        multiplier: 1.5,
-        pendingRewards: 312.5,
-        tierName: 'Gold',
-        canUnstakeWithoutPenalty: false,
-      });
-    } catch (error) {
-      console.error('Failed to fetch staking data:', error);
     }
     setLoading(false);
   };

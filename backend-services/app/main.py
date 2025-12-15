@@ -4,7 +4,7 @@ import logging
 import os
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from .api import devices, usage, auth, websockets, users, analytics
+from .api import devices, usage, auth, websockets, users, analytics, enterprise, staking, governance, bridge, nft
 from app.core.exceptions import register_exception_handlers
 from app.services.mqtt_service import mqtt_service
 from app.core.performance import profiler, measure_time
@@ -87,6 +87,11 @@ app.include_router(auth.router)
 app.include_router(websockets.router)
 app.include_router(users.router)
 app.include_router(analytics.router)
+app.include_router(enterprise.router)
+app.include_router(staking.router)
+app.include_router(governance.router)
+app.include_router(bridge.router)
+app.include_router(nft.router)
 
 
 
