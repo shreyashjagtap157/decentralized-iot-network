@@ -4,7 +4,6 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
 
 /**
  * @title DeviceNFT
@@ -12,7 +11,6 @@ import "@openzeppelin/contracts/utils/Counters.sol";
  * @dev Each NFT represents a registered device in the network
  */
 contract DeviceNFT is ERC721, ERC721URIStorage, Ownable {
-    using Counters for Counters.Counter;
     
     // ==================== Types ====================
     
@@ -28,7 +26,7 @@ contract DeviceNFT is ERC721, ERC721URIStorage, Ownable {
     
     // ==================== State ====================
     
-    Counters.Counter private _tokenIdCounter;
+    uint256 private _tokenIdCounter;
     
     mapping(uint256 => DeviceMetadata) public deviceMetadata;
     mapping(string => uint256) public deviceIdToTokenId;
@@ -66,8 +64,8 @@ contract DeviceNFT is ERC721, ERC721URIStorage, Ownable {
     ) external returns (uint256) {
         require(deviceIdToTokenId[deviceId] == 0, "Device already registered");
         
-        _tokenIdCounter.increment();
-        uint256 tokenId = _tokenIdCounter.current();
+        _tokenIdCounter++;
+        uint256 tokenId = _tokenIdCounter;
         
         _safeMint(to, tokenId);
         _setTokenURI(tokenId, tokenURI);
@@ -146,7 +144,7 @@ contract DeviceNFT is ERC721, ERC721URIStorage, Ownable {
     }
     
     function totalDevices() external view returns (uint256) {
-        return _tokenIdCounter.current();
+        return _tokenIdCounter;
     }
     
     // ==================== Admin ====================

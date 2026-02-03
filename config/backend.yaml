@@ -1,0 +1,130 @@
+edge_computing:
+  enabled: true
+  cluster_id: "iot-edge-1"
+  cluster_mode: "distributed"  # distributed or centralized
+  max_nodes: 10
+  kafka_brokers:
+    - "localhost:9092"
+  kafka_topics:
+    sensor_data: "iot.sensor.data"
+    anomalies: "iot.anomalies"
+    commands: "iot.commands"
+    control: "iot.control"
+  stream_processing:
+    enabled: true
+    window_size_sec: 300  # 5 minute windows
+    aggregation_interval_sec: 60
+  inference:
+    enabled: true
+    batch_size: 32
+    cache_predictions: true
+    model_update_interval_hours: 24
+  anomaly_detection:
+    enabled: true
+    algorithms:
+      - "isolation_forest"
+      - "local_outlier_factor"
+      - "autoencoder"
+    sensitivity: 0.95  # 0.0 to 1.0
+    min_samples: 10
+
+fog_nodes:
+  auto_discovery_enabled: true
+  discovery_interval_sec: 60
+  heartbeat_interval_sec: 30
+  node_timeout_sec: 120
+  default_config:
+    max_concurrent_workloads: 5
+    memory_limit_gb: 16
+    storage_limit_gb: 256
+
+blockchain_integration:
+  enabled: true
+  network: "ethereum"  # ethereum, polygon, bsc, etc.
+  contract_address: "0x1234567890123456789012345678901234567890"
+  rpc_endpoint: "http://localhost:8545"
+  confirmation_blocks: 3
+
+audit_trail:
+  enabled: true
+  db_backend: "sqlite"  # sqlite or postgresql
+  db_path: "./audit_trail.db"
+  retention_days: 365
+  merkle_tree_enabled: true
+  smart_contract_submission:
+    enabled: true
+    batch_interval_hours: 24
+    batch_size: 100
+  event_types:
+    - device_registered
+    - device_removed
+    - anomaly_detected
+    - model_updated
+    - config_changed
+    - data_processed
+
+capacity_planning:
+  enabled: true
+  planning_horizon_days: 30
+  replan_interval_hours: 1
+  forecasting:
+    algorithm: "prophet"  # prophet, arima, or exponential_smoothing
+    history_days: 90
+  cost_factors:
+    cost_per_cpu_hour: 0.10
+    cost_per_gb_memory_month: 5.0
+    cost_per_gb_storage_month: 1.0
+    egress_cost_per_gb: 0.12
+  optimization:
+    enabled: true
+    target_utilization_pct: 0.75
+    scale_up_threshold_pct: 0.85
+    scale_down_threshold_pct: 0.40
+    min_scale_down_interval_hours: 2
+
+security:
+  tls_enabled: true
+  tls_cert_path: "./certs/server.crt"
+  tls_key_path: "./certs/server.key"
+  authentication_enabled: true
+  api_key_enabled: true
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 1000
+  encryption:
+    enabled: true
+    algorithm: "AES-256-GCM"
+
+api:
+  enabled: true
+  host: "0.0.0.0"
+  port: 8080
+  endpoints:
+    - /health
+    - /status
+    - /metrics
+    - /config
+    - /nodes
+    - /audit
+    - /capacity_plan
+  documentation: "/docs"
+
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "./logs/backend.log"
+  max_file_size_mb: 100
+  backup_count: 5
+  
+monitoring:
+  enabled: true
+  prometheus_enabled: true
+  prometheus_port: 9090
+  metrics_namespace: "iot_backend"
+  performance_metrics:
+    - edge_cluster_utilization
+    - node_count
+    - active_workloads
+    - anomaly_detection_rate
+    - data_processing_latency
+    - blockchain_submission_success_rate

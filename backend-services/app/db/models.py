@@ -1,14 +1,39 @@
-from sqlalchemy import create_engine, Column, String, Float, DateTime, Integer, Boolean, Enum as SQLAlchemyEnum, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import Column, String, Float, DateTime, Integer, Boolean, Enum as SQLAlchemyEnum, ForeignKey
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import declarative_base
 from datetime import datetime
 import enum
 import os
 
+# Database URL - convert to async driver
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost/dbname")
+# Convert postgresql:// to postgresql+asyncpg:// for async support
+if DATABASE_URL.startswith("postgresql://"):
+    ASYNC_DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
+elif DATABASE_URL.startswith("postgres://"):
+    ASYNC_DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://")
+else:
+    ASYNC_DATABASE_URL = DATABASE_URL
 
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Async engine with connection pooling
+async_engine = create_async_engine(
+    ASYNC_DATABASE_URL,
+    pool_size=20,
+    max_overflow=40,
+    pool_recycle=1800,
+    pool_pre_ping=True,
+    echo=False,  # Set True for SQL debugging
+)
+
+# Async session factory
+AsyncSessionLocal = async_sessionmaker(
+    async_engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autocommit=False,
+    autoflush=False,
+)
+
 Base = declarative_base()
 
 class DeviceStatus(str, enum.Enum):
@@ -89,9 +114,11 @@ class User(Base):
     role = Column(String, default="user")
     is_active = Column(Boolean, default=True)
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+async def get_db():
+    """Async database session dependency"""
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
+

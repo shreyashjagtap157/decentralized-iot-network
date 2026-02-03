@@ -51,6 +51,7 @@ contract CrossChainBridge is Ownable, ReentrancyGuard, Pausable {
     mapping(address => bool) public validators;
     uint256 public validatorCount;
     uint256 public requiredSignatures = 2;
+    uint256 public collectedFees; // Track collected fees separately
     
     uint256[] public supportedChains;
     
@@ -158,6 +159,7 @@ contract CrossChainBridge is Ownable, ReentrancyGuard, Pausable {
         // Calculate fee
         uint256 fee = (amount * bridgeFee) / BASIS_POINTS;
         uint256 netAmount = amount - fee;
+        collectedFees += fee; // Track fees separately
         
         // Lock tokens
         require(token.transferFrom(msg.sender, address(this), amount), "Transfer failed");
@@ -356,7 +358,9 @@ contract CrossChainBridge is Ownable, ReentrancyGuard, Pausable {
     }
     
     function withdrawFees(address to) external onlyOwner {
-        uint256 balance = token.balanceOf(address(this));
-        require(token.transfer(to, balance), "Transfer failed");
+        require(collectedFees > 0, "No fees to withdraw");
+        uint256 fees = collectedFees;
+        collectedFees = 0;
+        require(token.transfer(to, fees), "Transfer failed");
     }
 }

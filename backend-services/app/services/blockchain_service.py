@@ -1,6 +1,7 @@
 import os
 import json
-from web3 import Web3
+import asyncio
+from web3 import AsyncWeb3, AsyncHTTPProvider
 from web3.exceptions import ContractLogicError
 from app.core.config import settings
 from app.core.logging import logger
@@ -32,14 +33,17 @@ NETWORK_COMPENSATION_ABI = [
 
 
 class BlockchainService:
+    """Async blockchain service using Web3 AsyncHTTPProvider"""
+    
     def __init__(self):
         provider_url = settings.WEB3_PROVIDER_URL
-        self.w3 = Web3(Web3.HTTPProvider(provider_url))
+        # Use async provider for non-blocking calls
+        self.w3 = AsyncWeb3(AsyncHTTPProvider(provider_url))
         self.contract = None
         self.oracle_account = None
-        self._load_contract()
+        self._initialized = False
 
-    def _load_contract(self):
+    async def _load_contract(self):
         """Load the smart contract from environment configuration."""
         contract_address = settings.CONTRACT_ADDRESS
         oracle_private_key = settings.ORACLE_PRIVATE_KEY
