@@ -1,3 +1,12 @@
+# Current verified status — 22 October 2026
+
+> **Maturity: multi-component prototype; production network operation not verified.** The repository includes backend, smart-contract, firmware, mobile, monitoring and dashboard material, but checked-in architecture and feature lists do not prove that an end-to-end network is deployed or that its performance targets have been achieved.
+>
+> The latest observed code push was 3 February 2026. The latest inspected load-testing run and several preceding weekly runs failed; the underlying older job logs were not available during this audit, so the root cause remains undetermined. See [GitHub Actions](https://github.com/shreyashjagtap157/decentralized-iot-network/actions), rerun the load test with retained logs, and report only measured latency/throughput results.
+>
+> Five dependency-update pull requests remain open. No GitHub release or verified production deployment was found. Smart-contract addresses, live reward transactions and real-device network operation were not independently verified.
+
+---
 # Decentralized IoT Network Project
 
 A comprehensive decentralized data-sharing and compensation network that enables IoT devices to act as network repeaters and earn cryptocurrency rewards.
