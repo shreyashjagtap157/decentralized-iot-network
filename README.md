@@ -9,8 +9,6 @@
 > Five dependency-update pull requests remain open. No GitHub release or verified production deployment was found. Smart-contract addresses, live reward transactions and real-device network operation were not independently verified.
 
 ---
-# Decentralized IoT Network Project
-
 A comprehensive decentralized data-sharing and compensation network that enables IoT devices to act as network repeaters and earn cryptocurrency rewards.
 
 ## 🏗️ Architecture Overview
