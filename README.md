@@ -1,4 +1,6 @@
-# Current verified status — 22 October 2026
+# Decentralized IoT Network
+
+## Current verified status — 22 October 2026
 
 > **Maturity: multi-component prototype; production network operation not verified.** The repository includes backend, smart-contract, firmware, mobile, monitoring and dashboard material, but checked-in architecture and feature lists do not prove that an end-to-end network is deployed or that its performance targets have been achieved.
 >
